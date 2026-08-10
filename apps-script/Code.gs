@@ -4,16 +4,16 @@
  *
  * The front end POSTs a JSON body (as text/plain, to avoid a CORS preflight) with fields:
  *   campaign_slug, campaign_title, sender_name, sender_email, sender_phone,
- *   constituency, minister, timestamp
+ *   constituency, minister, timestamp, token
  *
  * This script appends one row per submission to the "Submissions" sheet,
  * creating the header row on first run.
  */
 
-// Optional lightweight deterrent against random bot spam. Set the same value
-// in assets/js/config.js as window.SUBMIT_TOKEN if you want to enable it, then
-// uncomment the check below. Leave both blank to accept all submissions.
-const SHARED_TOKEN = "";
+// Lightweight deterrent against random bot spam. Must match window.SUBMIT_TOKEN
+// in assets/js/config.js. Not real security — it's readable in the site's JS by
+// anyone who looks — just enough to stop non-targeted spam bots.
+const SHARED_TOKEN = "JdKbkmiaOIO41uUqgrTpaPO2LL-4evwC";
 
 const SHEET_NAME = "Submissions";
 const HEADERS = [
@@ -25,10 +25,10 @@ function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
 
-    // if (SHARED_TOKEN && data.token !== SHARED_TOKEN) {
-    //   return ContentService.createTextOutput(JSON.stringify({ ok: false, error: "unauthorized" }))
-    //     .setMimeType(ContentService.MimeType.JSON);
-    // }
+    if (SHARED_TOKEN && data.token !== SHARED_TOKEN) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: "unauthorized" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
 
     const sheet = getOrCreateSheet();
     sheet.appendRow([

@@ -110,7 +110,7 @@ async function submitToSheet(payload) {
       method: "POST",
       mode: "no-cors", // Apps Script doesn't return CORS headers; we don't need to read the response
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ ...payload, token: window.SUBMIT_TOKEN || "" })
     });
   } catch (err) {
     console.warn("Sheet logging failed (send still proceeds):", err);
