@@ -14,7 +14,7 @@
         "cc": []
       },
       "subject": "Please prioritise repair of {{constituency}} local roads",
-      "body": "{{subject_line}}\n\nRespected Sir/Madam,\n\nI am writing as a resident of {{constituency}} constituency to draw your attention to the poor condition of local roads in our area, which has become a daily hazard for commuters, students, and senior citizens, especially during the monsoon.\n\nI request that the department prioritise inspection and repair works in this constituency at the earliest, and share an indicative timeline for the same.\n\nThank you for your attention to this matter.\n\nRegards,\n{{sender_name}}\n{{constituency}} constituency\n{{contact_line}}\n{{date}}",
+      "body": "Respected Sir/Madam,\n\nI am writing as a resident of {{constituency}} constituency to draw your attention to the poor condition of local roads in our area, which has become a daily hazard for commuters, students, and senior citizens, especially during the monsoon.\n\nI request that the department prioritise inspection and repair works in this constituency at the earliest, and share an indicative timeline for the same.\n\nThank you for your attention to this matter.\n\nRegards,\n{{sender_name}}\n{{constituency}} constituency\n{{contact_line}}\n{{date}}",
       "created": "2026-08-10"
     }
   ]

@@ -40,20 +40,6 @@ function isMobileDevice() {
     (navigator.maxTouchPoints > 1 && /Mac/i.test(navigator.platform)); // iPadOS reports as Mac
 }
 
-// Opens a URL (mailto: or https:) without navigating the current tab away from the form.
-// For mailto: specifically, a synthetic anchor click is more reliable across browsers than
-// window.open() or window.location — some browsers treat window.open("mailto:...") as a
-// popup and block it even on a trusted click.
-function openInNewTab(url) {
-  const a = document.createElement("a");
-  a.href = url;
-  a.target = "_blank";
-  a.rel = "noopener";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-}
-
 async function copyToClipboard(text) {
   if (navigator.clipboard && window.isSecureContext) {
     try {
@@ -109,24 +95,22 @@ function substitute(text, values) {
     .replace(/{{\s*sender_name\s*}}/g, values.sender_name || "[Your Name]")
     .replace(/{{\s*constituency\s*}}/g, values.constituency || "[Your Constituency]")
     .replace(/{{\s*date\s*}}/g, values.date || todayHuman())
-    .replace(/{{\s*contact_line\s*}}/g, values.contact_line || "[Your Email]")
-    .replace(/{{\s*subject_line\s*}}/g, values.subject_line || "");
+    .replace(/{{\s*contact_line\s*}}/g, values.contact_line || "[Your Email]");
 }
 
-// Builds the full placeholder set for one letter, including the two computed ones:
-// contact_line (Email + Phone, phone omitted if not given) and subject_line ("Subject: ...").
+// Builds the full placeholder set for one letter, including the computed contact_line
+// (Email + Phone, phone omitted if not given).
 function buildLetterValues(campaign, { senderName, senderEmail, senderPhone, constituency }) {
   const date = todayHuman();
-  const base = { sender_name: senderName, constituency, date };
-
   const contactLines = [];
   if (senderEmail) contactLines.push(`Email: ${senderEmail}`);
   if (senderPhone) contactLines.push(`Phone: ${senderPhone}`);
 
   return {
-    ...base,
-    contact_line: contactLines.length ? contactLines.join("\n") : "",
-    subject_line: `Subject: ${substitute(campaign.subject, base)}`
+    sender_name: senderName,
+    constituency,
+    date,
+    contact_line: contactLines.length ? contactLines.join("\n") : ""
   };
 }
 
@@ -134,7 +118,9 @@ function buildMailtoUrl({ to, cc, subject, body }) {
   const params = new URLSearchParams();
   if (cc && cc.length) params.set("cc", cc.join(","));
   params.set("subject", subject);
-  params.set("body", body);
+  // RFC 6068 expects CRLF line breaks in a mailto: body — plain \n (as URLSearchParams
+  // would encode it, %0A) renders as one unbroken paragraph in several mail clients.
+  params.set("body", body.replace(/\r?\n/g, "\r\n"));
   return `mailto:${encodeURIComponent(to)}?${params.toString().replace(/\+/g, "%20")}`;
 }
 
@@ -312,7 +298,7 @@ async function renderCampaignPage() {
       body: data.finalBody
     });
 
-    openInNewTab(mailto);
+    window.location.href = mailto;
     statusEl.className = "status-msg ok";
     statusEl.textContent = isMobileDevice()
       ? "Your mail app should now open with the letter ready — press Send there to finish."
