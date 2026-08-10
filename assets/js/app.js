@@ -40,6 +40,20 @@ function isMobileDevice() {
     (navigator.maxTouchPoints > 1 && /Mac/i.test(navigator.platform)); // iPadOS reports as Mac
 }
 
+// Opens a URL (mailto: or https:) without navigating the current tab away from the form.
+// For mailto: specifically, a synthetic anchor click is more reliable across browsers than
+// window.open() or window.location — some browsers treat window.open("mailto:...") as a
+// popup and block it even on a trusted click.
+function openInNewTab(url) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.target = "_blank";
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 async function copyToClipboard(text) {
   if (navigator.clipboard && window.isSecureContext) {
     try {
@@ -298,7 +312,7 @@ async function renderCampaignPage() {
       body: data.finalBody
     });
 
-    window.location.href = mailto;
+    openInNewTab(mailto);
     statusEl.className = "status-msg ok";
     statusEl.textContent = isMobileDevice()
       ? "Your mail app should now open with the letter ready — press Send there to finish."
