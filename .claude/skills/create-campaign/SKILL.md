@@ -42,15 +42,34 @@ Look up the chosen minister's `email` field in `data/ministers.json`.
 
 Write:
 
-- **subject** — one line, may include `{{constituency}}`.
-- **body** — 150–250 words, addressed "Respected Sir/Madam," or the minister's proper title,
-  formal register, references the constituency, states the ask plainly, closes with
-  `{{sender_name}}`, `{{constituency}}`, `{{date}}` on their own lines. Must include these three
-  placeholders (verbatim, double curly braces) — the site substitutes them live as the visitor
-  fills the form:
-  - `{{sender_name}}`
-  - `{{constituency}}`
-  - `{{date}}`
+- **subject** — one line, may include `{{constituency}}`. This becomes the actual email's
+  Subject header (used by both the Gmail-compose and mailto: send paths).
+- **body** — 150–250 words, formal register, references the constituency, states the ask
+  plainly. Must start with `{{subject_line}}` (expands to `Subject: <the subject above>` — the
+  formal-letter convention of restating the subject inline before the salutation), then
+  "Respected Sir/Madam," and the letter itself, and close with a signature block using
+  `{{sender_name}}`, `{{constituency}}`, `{{contact_line}}`, `{{date}}` on their own lines.
+  `{{contact_line}}` expands to `Email: ...` (and `Phone: ...` on its own line, only if the
+  visitor gave one) — so the office can identify/reply to the sender directly. Use this
+  skeleton and just replace the middle paragraphs:
+
+  ```
+  {{subject_line}}
+
+  Respected Sir/Madam,
+
+  <2-4 paragraphs of letter body>
+
+  Regards,
+  {{sender_name}}
+  {{constituency}} constituency
+  {{contact_line}}
+  {{date}}
+  ```
+
+  Required placeholders (verbatim, double curly braces) — the site substitutes them live as the
+  visitor fills the form: `{{subject_line}}`, `{{sender_name}}`, `{{constituency}}`,
+  `{{contact_line}}`, `{{date}}`.
 - **background** — 2–4 sentences shown on the campaign page above the letter, explaining the
   issue to a visitor who knows nothing about it yet.
 - **summary** — one sentence for the homepage card.
@@ -80,7 +99,7 @@ past ~1,800 characters.
     "cc": []
   },
   "subject": "Subject line with optional {{constituency}}",
-  "body": "Respected Sir/Madam,\n\n...letter text with {{sender_name}}, {{constituency}}, {{date}}...\n\nRegards,\n{{sender_name}}\n{{constituency}} constituency\n{{date}}",
+  "body": "{{subject_line}}\n\nRespected Sir/Madam,\n\n...letter text with {{constituency}}...\n\nRegards,\n{{sender_name}}\n{{constituency}} constituency\n{{contact_line}}\n{{date}}",
   "created": "YYYY-MM-DD"
 }
 ```

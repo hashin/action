@@ -63,7 +63,26 @@ function substitute(text, values) {
   return text
     .replace(/{{\s*sender_name\s*}}/g, values.sender_name || "[Your Name]")
     .replace(/{{\s*constituency\s*}}/g, values.constituency || "[Your Constituency]")
-    .replace(/{{\s*date\s*}}/g, values.date || todayHuman());
+    .replace(/{{\s*date\s*}}/g, values.date || todayHuman())
+    .replace(/{{\s*contact_line\s*}}/g, values.contact_line || "[Your Email]")
+    .replace(/{{\s*subject_line\s*}}/g, values.subject_line || "");
+}
+
+// Builds the full placeholder set for one letter, including the two computed ones:
+// contact_line (Email + Phone, phone omitted if not given) and subject_line ("Subject: ...").
+function buildLetterValues(campaign, { senderName, senderEmail, senderPhone, constituency }) {
+  const date = todayHuman();
+  const base = { sender_name: senderName, constituency, date };
+
+  const contactLines = [];
+  if (senderEmail) contactLines.push(`Email: ${senderEmail}`);
+  if (senderPhone) contactLines.push(`Phone: ${senderPhone}`);
+
+  return {
+    ...base,
+    contact_line: contactLines.length ? contactLines.join("\n") : "",
+    subject_line: `Subject: ${substitute(campaign.subject, base)}`
+  };
 }
 
 function buildMailtoUrl({ to, cc, subject, body }) {
@@ -170,7 +189,7 @@ async function renderCampaignPage() {
 
       <div class="panel">
         <h2>Your letter (editable)</h2>
-        <textarea id="letterPreview">${escapeHtml(substitute(campaign.body, {}))}</textarea>
+        <textarea id="letterPreview">${escapeHtml(substitute(campaign.body, buildLetterValues(campaign, {})))}</textarea>
         <p class="hint">Edit freely — this is exactly what will be sent.</p>
       </div>
 
@@ -182,24 +201,29 @@ async function renderCampaignPage() {
   `;
 
   const nameEl = document.getElementById("senderName");
+  const emailEl = document.getElementById("senderEmail");
+  const phoneEl = document.getElementById("senderPhone");
   const constEl = document.getElementById("constituency");
   const letterEl = document.getElementById("letterPreview");
   const statusEl = document.getElementById("statusMsg");
 
   function refreshLetter() {
-    letterEl.value = substitute(campaign.body, {
-      sender_name: nameEl.value.trim(),
-      constituency: constEl.value,
-      date: todayHuman()
-    });
+    letterEl.value = substitute(campaign.body, buildLetterValues(campaign, {
+      senderName: nameEl.value.trim(),
+      senderEmail: emailEl.value.trim(),
+      senderPhone: phoneEl.value.trim(),
+      constituency: constEl.value
+    }));
   }
   nameEl.addEventListener("input", refreshLetter);
+  emailEl.addEventListener("input", refreshLetter);
+  phoneEl.addEventListener("input", refreshLetter);
   constEl.addEventListener("change", refreshLetter);
 
   function gatherAndValidate() {
     const senderName = nameEl.value.trim();
-    const senderEmail = document.getElementById("senderEmail").value.trim();
-    const senderPhone = document.getElementById("senderPhone").value.trim();
+    const senderEmail = emailEl.value.trim();
+    const senderPhone = phoneEl.value.trim();
     const constituency = constEl.value;
 
     if (!senderName || !senderEmail || !constituency) {
