@@ -18,7 +18,7 @@ Three one-time setup steps. Do them in this order.
    ```js
    window.APPS_SCRIPT_URL = "https://script.google.com/macros/s/XXXXXXXX/exec";
    ```
-7. Commit and push that change. Submissions will now silently log to your Sheet's "Submissions" tab in the background — visitors never see the Sheet, only the form.
+7. Commit and push that change. Submissions will now silently log in the background — visitors never see the Sheet, only the form. Each campaign gets its **own tab, named after the campaign**, created automatically the first time someone sends a letter for it (see "How submissions are organised" below).
 
 Whenever you edit `Code.gs` later, you need to **Deploy → Manage deployments → Edit (pencil) → New version → Deploy** again for changes to take effect.
 
@@ -50,13 +50,32 @@ After pushing, in the repo on GitHub go to **Settings → Pages** and confirm:
 
 That's it — visiting `https://action.hashin.me` should show the site.
 
+## How submissions are organised
+
+Every campaign gets its own sheet tab, named after the campaign's title (e.g. sending a letter
+for "Demo: Fix My Local Road" creates/uses a tab named that), with columns: Timestamp, Sender
+Name, Sender Email, Sender Phone, Constituency, Minister, Campaign Slug, Received At (Server).
+The tab is created automatically on that campaign's first submission — nothing to set up per
+campaign.
+
+Two things worth knowing:
+- Tab names can't contain `[ ] * ? / \ :` or exceed 100 characters, so long or punctuated
+  titles get lightly cleaned up (colons become dashes, names get truncated) — the script does
+  this automatically.
+- If you rename a campaign's `title` in `data/campaigns.json` after it's already collected
+  submissions, new ones start a new tab under the new name rather than continuing the old one.
+  Keep titles stable once a campaign is live, or manually rename the sheet tab to match.
+
+"Start a Campaign" proposals (below) are separate from this — they always go to one shared
+"Campaign Requests" tab, since they aren't yet real campaigns.
+
 ## Testing safely
 
 The site ships with one **demo campaign** ("Demo: Fix My Local Road") whose "minister" email is your own inbox (`hashjith@gmail.com`), so you can click through the whole flow — including the Google Sheet logging — without emailing anyone real. Once you're happy, add real campaigns (see the `create-campaign` skill) and either edit `data/campaigns.json` to remove the demo, or set its `"status"` to `"closed"` so it stops showing on the homepage but stays in history.
 
 ## Reviewing "Start a Campaign" requests
 
-Any visitor can propose a new campaign from `start-campaign.html` (linked from the homepage). Nothing is published automatically — each submission lands as a new row in the **"Campaign Requests"** tab of your Google Sheet (created automatically on first submission, alongside the existing "Submissions" tab), with columns: Timestamp, Status, Campaign Title, Category, Target Minister, Background / Issue, The Ask, Sender Name, Sender Email, Sender Phone, Constituency.
+Any visitor can propose a new campaign from `start-campaign.html` (linked from the homepage). Nothing is published automatically — each submission lands as a new row in the **"Campaign Requests"** tab of your Google Sheet (created automatically on first submission), with columns: Timestamp, Status, Campaign Title, Category, Target Minister, Background / Issue, The Ask, Sender Name, Sender Email, Sender Phone, Constituency.
 
 To review:
 1. Open the Sheet and check the "Campaign Requests" tab periodically.

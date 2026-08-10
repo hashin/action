@@ -17,7 +17,9 @@ registration. No paid backend.
   clipboard, for any other webmail or app). Whichever path, the visitor presses Send
   themselves — nothing is sent from a server.
 - **Storage:** a Google Sheet, written to in the background via a Google Apps Script Web App
-  (free, no server to run or pay for). Visitors never see the Sheet — only a normal form.
+  (free, no server to run or pay for). Visitors never see the Sheet — only a normal form. Each
+  campaign gets its own tab, named after the campaign, created automatically on its first
+  submission — so senders for different campaigns never mix in one list.
 - **Letters:** pre-written per campaign (see the `create-campaign` skill below) rather than a
   live AI API call, since that would need a paid/hosted backend or an exposed API key to work
   from a static site.
@@ -40,8 +42,8 @@ assets/js/config.js      Set APPS_SCRIPT_URL here after deploying the Apps Scrip
 data/campaigns.json      All campaigns — the site's only content database
 data/ministers.json      Kerala Council of Ministers roster (emails start as placeholders)
 data/ministers-roster.xlsx   Fill-in spreadsheet to collect verified staff emails
-apps-script/Code.gs       Google Apps Script source — appends submissions and campaign
-                            requests to separate tabs in one Sheet
+apps-script/Code.gs       Google Apps Script source — one tab per campaign for sends,
+                            plus a shared tab for campaign requests
 docs/SETUP.md             Step-by-step: Apps Script, DNS (Spaceship), GitHub Pages,
                             reviewing campaign requests
 .claude/skills/create-campaign/   A Claude Code skill: run it to interactively draft
