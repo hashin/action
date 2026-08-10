@@ -9,4 +9,4 @@ window.SUBMIT_TOKEN = "JdKbkmiaOIO41uUqgrTpaPO2LL-4evwC";
 // Ops dashboard (ops.html) sign-in. This is a public OAuth 2.0 Web Client ID — safe to expose
 // in front-end code, unlike an API key or secret. Get it from Google Cloud Console (see
 // docs/SETUP.md, part 4). Must exactly match GOOGLE_CLIENT_ID in apps-script/Code.gs.
-window.GOOGLE_CLIENT_ID = "PASTE_YOUR_CLIENT_ID.apps.googleusercontent.com";
+window.GOOGLE_CLIENT_ID = "730575915949-6lhke3abh9c67p0cqarup9d6r5l2c85j.apps.googleusercontent.com";
