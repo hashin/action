@@ -17,6 +17,12 @@
  *     and mark it "Published" or "Rejected" once you've acted on it (see docs/SETUP.md).
  *
  * Each sheet gets its header row created automatically on first use.
+ *
+ * doGet handles the internal ops dashboard (ops.html): reading a live snapshot (default),
+ * and the "Approve" action, which drafts a letter with Gemini and opens a GitHub pull request
+ * adding the campaign to data/campaigns.json — merging that PR is what makes it live. Both
+ * require a Google-signed credential from an address in ALLOWED_OPS_EMAILS. See docs/SETUP.md,
+ * parts 4 and 5.
  */
 
 // Lightweight deterrent against random bot spam. Must match window.SUBMIT_TOKEN
@@ -28,6 +34,17 @@ const SHARED_TOKEN = "JdKbkmiaOIO41uUqgrTpaPO2LL-4evwC";
 // Must exactly match GOOGLE_CLIENT_ID in assets/js/config.js. See docs/SETUP.md, part 4.
 const GOOGLE_CLIENT_ID = "730575915949-6lhke3abh9c67p0cqarup9d6r5l2c85j.apps.googleusercontent.com";
 const ALLOWED_OPS_EMAILS = ["sneha4luvn@gmail.com", "hashjith@gmail.com"]; // add more Google accounts here to grant access
+
+// "Approve" on ops.html (see docs/SETUP.md, part 5). These are real secrets — set them in
+// Project Settings → Script Properties in the Apps Script editor, NEVER paste them into this
+// file (which is committed to a public GitHub repo).
+const GITHUB_REPO = "hashin/action";
+
+function getSecret(name) {
+  const value = PropertiesService.getScriptProperties().getProperty(name);
+  if (!value) throw new Error(name + " isn't set — add it in Project Settings → Script Properties (see docs/SETUP.md, part 5).");
+  return value;
+}
 
 const FALLBACK_SHEET_NAME = "Submissions"; // used only if a send has no campaign title/slug at all
 const SEND_HEADERS = [
@@ -109,6 +126,10 @@ function doGet(e) {
       return jsonOutput({ ok: false, error: "unauthorized", reasonDetail: verified.reason });
     }
 
+    if (e.parameter.action === "approve") {
+      return jsonOutput(approveCampaignFlow(e.parameter.row));
+    }
+
     return jsonOutput({ ok: true, data: buildOpsSnapshot() });
   } catch (err) {
     return jsonOutput({ ok: false, error: String(err) });
@@ -186,21 +207,245 @@ function buildOpsSnapshot() {
   if (reqSheet && reqSheet.getLastRow() >= 2) {
     const statusCol = CAMPAIGN_REQUESTS_HEADERS.indexOf("Status");
     const rows = reqSheet.getRange(2, 1, reqSheet.getLastRow() - 1, CAMPAIGN_REQUESTS_HEADERS.length).getValues();
-    rows.forEach(function (row) {
+    const ministers = safeFetchMinisters();
+    rows.forEach(function (row, i) {
       if (String(row[statusCol] || "").trim() !== "") return; // already reviewed
+      const targetMinister = String(row[4] || "");
+      const minister = ministers.filter(function (m) { return m.name === targetMinister; })[0];
       pendingRequests.push({
+        rowIndex: 2 + i, // actual sheet row number — needed to act on this request later
         timestamp: row[0] instanceof Date ? row[0].toISOString() : String(row[0] || ""),
         title: String(row[2] || ""),
         category: String(row[3] || ""),
-        targetMinister: String(row[4] || ""),
+        targetMinister: targetMinister,
         senderName: String(row[7] || ""),
         senderEmail: String(row[8] || ""),
-        constituency: String(row[10] || "")
+        constituency: String(row[10] || ""),
+        // Approve is blocked client-side when this is false — a campaign shouldn't be able
+        // to go live pointing at a minister whose email is still a FILL_ME placeholder.
+        emailVerified: !!(minister && minister.email && minister.email !== "FILL_ME")
       });
     });
   }
 
   return { totalSent: totalSent, sentThisWeek: sentThisWeek, campaigns: campaigns, pendingRequests: pendingRequests };
+}
+
+// ---------- Approve flow (ops.html "Approve" button) ----------
+// Drafts a letter with Gemini and opens a GitHub pull request adding it to
+// data/campaigns.json — merging that PR is what actually makes the campaign live. Nothing
+// here pushes straight to main, and it refuses to run at all if the target minister's email
+// in ministers.json is still the "FILL_ME" placeholder.
+
+function approveCampaignFlow(rowIndexParam) {
+  const rowIndex = parseInt(rowIndexParam, 10);
+  if (!rowIndex || rowIndex < 2) return { ok: false, error: "invalid row" };
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const reqSheet = ss.getSheetByName(CAMPAIGN_REQUESTS_SHEET_NAME);
+  if (!reqSheet) return { ok: false, error: "no Campaign Requests sheet found" };
+
+  const row = reqSheet.getRange(rowIndex, 1, 1, CAMPAIGN_REQUESTS_HEADERS.length).getValues()[0];
+  const statusCol = CAMPAIGN_REQUESTS_HEADERS.indexOf("Status");
+  if (String(row[statusCol] || "").trim() !== "") {
+    return { ok: false, error: "already reviewed" };
+  }
+
+  const title = String(row[2] || "");
+  const category = String(row[3] || "");
+  const targetMinister = String(row[4] || "");
+  const background = String(row[5] || "");
+  const theAsk = String(row[6] || "");
+  const senderName = String(row[7] || "");
+  const senderEmail = String(row[8] || "");
+  const timestamp = row[0] instanceof Date ? row[0].toISOString() : String(row[0] || "");
+
+  const ministers = fetchMinistersFromGitHub();
+  const minister = ministers.filter(function (m) { return m.name === targetMinister; })[0];
+  if (!minister) return { ok: false, error: "minister not found in ministers.json: " + targetMinister };
+  if (!minister.email || minister.email === "FILL_ME") {
+    return { ok: false, error: "minister email not verified", reasonDetail: "Add a real email for " + minister.name + " in data/ministers.json first." };
+  }
+
+  const letter = draftLetterWithGemini({ title: title, category: category, minister: minister, background: background, theAsk: theAsk });
+
+  const campaignEntry = {
+    slug: "", // finalized inside openCampaignPullRequest, once it knows the other existing slugs
+    status: "live",
+    title: title,
+    category: category || minister.portfolios || minister.designation || "",
+    summary: letter.summary,
+    background: background,
+    minister: { name: minister.name, designation: minister.portfolios || minister.designation || "", email: minister.email, cc: [] },
+    subject: letter.subject,
+    body: letter.body,
+    created: new Date().toISOString().slice(0, 10)
+  };
+
+  const prUrl = openCampaignPullRequest(campaignEntry, { senderName: senderName, senderEmail: senderEmail, timestamp: timestamp });
+
+  reqSheet.getRange(rowIndex, statusCol + 1).setValue("PR opened: " + prUrl);
+
+  return { ok: true, prUrl: prUrl };
+}
+
+// Ministers live in the site's own data file, not the Sheet — always read the current version
+// from GitHub rather than trusting anything cached, so a just-filled-in email is picked up
+// immediately without needing a separate sync step.
+function fetchMinistersFromGitHub() {
+  const res = UrlFetchApp.fetch(
+    "https://raw.githubusercontent.com/" + GITHUB_REPO + "/main/data/ministers.json",
+    { muteHttpExceptions: true }
+  );
+  if (res.getResponseCode() !== 200) {
+    throw new Error("couldn't fetch ministers.json from GitHub: " + res.getResponseCode());
+  }
+  return JSON.parse(res.getContentText()).ministers || [];
+}
+
+// Used by the read-only dashboard snapshot, where a GitHub hiccup shouldn't take down the
+// whole page — just fail closed (no minister counts as verified) rather than crash.
+function safeFetchMinisters() {
+  try {
+    return fetchMinistersFromGitHub();
+  } catch (err) {
+    return [];
+  }
+}
+
+// Drafts a formal citizen-to-minister letter with Gemini, matching the tone of existing
+// campaigns. Requires a free Gemini API key (Google AI Studio) in Script Properties.
+function draftLetterWithGemini(input) {
+  const apiKey = getSecret("GEMINI_API_KEY");
+
+  const prompt = [
+    "You draft short, formal letters from a Kerala citizen to a state minister, for a civic action website called action.hashin.me.",
+    "Match this exact style, register, and structure (from an existing live campaign):",
+    "",
+    "SUBJECT: Please prioritise repair of {{constituency}} local roads",
+    "BODY:",
+    "Respected Sir/Madam,",
+    "",
+    "I am writing as a resident of {{constituency}} constituency to draw your attention to the poor condition of local roads in our area, which has become a daily hazard for commuters, students, and senior citizens, especially during the monsoon.",
+    "",
+    "I request that the department prioritise inspection and repair works in this constituency at the earliest, and share an indicative timeline for the same.",
+    "",
+    "Thank you for your attention to this matter.",
+    "",
+    "Regards,",
+    "{{sender_name}}",
+    "{{constituency}} constituency",
+    "{{contact_line}}",
+    "{{date}}",
+    "",
+    "Now draft a new letter for this campaign. Keep the placeholder tokens EXACTLY as shown — {{sender_name}}, {{constituency}}, {{contact_line}}, {{date}} — wherever a sender's personal detail belongs. Do not invent facts beyond what's given below; write only from the background and ask provided.",
+    "",
+    "Campaign title: " + input.title,
+    "Minister: " + input.minister.name + ", " + (input.minister.portfolios || input.minister.designation || ""),
+    "Category: " + (input.category || ""),
+    "Issue background (from the citizen who proposed this): " + input.background,
+    "What the minister should do: " + input.theAsk,
+    "",
+    "Respond with ONLY minified JSON, no markdown code fences, in exactly this shape:",
+    '{"subject":"...","body":"...","summary":"one sentence, under 200 characters, no placeholder tokens"}'
+  ].join("\n");
+
+  const res = UrlFetchApp.fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey,
+    {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      muteHttpExceptions: true
+    }
+  );
+  if (res.getResponseCode() !== 200) {
+    throw new Error("Gemini call failed: " + res.getResponseCode() + " " + res.getContentText());
+  }
+
+  const data = JSON.parse(res.getContentText());
+  const text = data.candidates && data.candidates[0] && data.candidates[0].content.parts[0].text;
+  if (!text) throw new Error("Gemini returned no text: " + res.getContentText());
+
+  const cleaned = text.trim().replace(/^```(json)?\s*/i, "").replace(/```\s*$/, "");
+  const letter = JSON.parse(cleaned);
+  if (!letter.subject || !letter.body) throw new Error("Gemini response missing subject/body: " + cleaned);
+  return letter;
+}
+
+// Opens a PR against data/campaigns.json on GitHub rather than pushing to main directly —
+// merging it is the human review step before a campaign (and its AI-drafted letter) goes
+// live. Requires a GitHub token (Contents + Pull requests write, scoped to just this repo)
+// in Script Properties.
+function openCampaignPullRequest(campaignEntry, meta) {
+  const token = getSecret("GITHUB_TOKEN");
+  const apiBase = "https://api.github.com/repos/" + GITHUB_REPO;
+  const ghHeaders = { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" };
+
+  const fileRes = UrlFetchApp.fetch(apiBase + "/contents/data/campaigns.json?ref=main", { headers: ghHeaders, muteHttpExceptions: true });
+  if (fileRes.getResponseCode() !== 200) throw new Error("couldn't read campaigns.json from GitHub: " + fileRes.getContentText());
+  const fileData = JSON.parse(fileRes.getContentText());
+  const currentJson = JSON.parse(Utilities.newBlob(Utilities.base64Decode(fileData.content), "application/json").getDataAsString());
+
+  const existingSlugs = currentJson.campaigns.map(function (c) { return c.slug; });
+  campaignEntry.slug = uniqueSlug(campaignEntry.title, existingSlugs);
+  currentJson.campaigns.push(campaignEntry);
+  const newContent = JSON.stringify(currentJson, null, 2) + "\n";
+
+  const mainRefRes = UrlFetchApp.fetch(apiBase + "/git/ref/heads/main", { headers: ghHeaders, muteHttpExceptions: true });
+  if (mainRefRes.getResponseCode() !== 200) throw new Error("couldn't read main branch ref: " + mainRefRes.getContentText());
+  const mainSha = JSON.parse(mainRefRes.getContentText()).object.sha;
+
+  const branchName = "campaign/" + campaignEntry.slug + "-" + Date.now();
+  const branchRes = UrlFetchApp.fetch(apiBase + "/git/refs", {
+    method: "post", headers: ghHeaders, contentType: "application/json",
+    payload: JSON.stringify({ ref: "refs/heads/" + branchName, sha: mainSha }),
+    muteHttpExceptions: true
+  });
+  if (branchRes.getResponseCode() !== 201) throw new Error("couldn't create branch: " + branchRes.getContentText());
+
+  const putRes = UrlFetchApp.fetch(apiBase + "/contents/data/campaigns.json", {
+    method: "put", headers: ghHeaders, contentType: "application/json",
+    payload: JSON.stringify({
+      message: "Add campaign: " + campaignEntry.title,
+      content: Utilities.base64Encode(newContent),
+      sha: fileData.sha,
+      branch: branchName
+    }),
+    muteHttpExceptions: true
+  });
+  if (putRes.getResponseCode() !== 200 && putRes.getResponseCode() !== 201) {
+    throw new Error("couldn't update campaigns.json: " + putRes.getContentText());
+  }
+
+  const prBody = [
+    "AI-drafted from a citizen submission via the ops dashboard — **please review the letter text and minister details before merging.**",
+    "",
+    "- Submitted by: " + meta.senderName + " <" + meta.senderEmail + ">",
+    "- Submitted: " + meta.timestamp,
+    "- Minister email used: " + campaignEntry.minister.email + " (from ministers.json)",
+    "",
+    "Merging this PR makes the campaign live immediately."
+  ].join("\n");
+
+  const prRes = UrlFetchApp.fetch(apiBase + "/pulls", {
+    method: "post", headers: ghHeaders, contentType: "application/json",
+    payload: JSON.stringify({ title: "Add campaign: " + campaignEntry.title, head: branchName, base: "main", body: prBody }),
+    muteHttpExceptions: true
+  });
+  if (prRes.getResponseCode() !== 201) throw new Error("couldn't open PR: " + prRes.getContentText());
+  return JSON.parse(prRes.getContentText()).html_url;
+}
+
+function uniqueSlug(title, existingSlugs) {
+  const base = String(title).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").substring(0, 60) || "campaign";
+  let slug = base;
+  let n = 2;
+  while (existingSlugs.indexOf(slug) !== -1) {
+    slug = base + "-" + n;
+    n++;
+  }
+  return slug;
 }
 
 // Google Sheets tab names can't contain [ ] * ? / \ : , can't be blank, can't exceed 100

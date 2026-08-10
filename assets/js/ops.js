@@ -2,6 +2,10 @@
 // authorised account; the Apps Script endpoint re-verifies that server-side on every request,
 // so this file only has to handle the UI, not enforce access on its own.
 
+// Kept around after sign-in so the "Approve" button can make its own follow-up request
+// without asking the visitor to sign in again.
+let currentIdToken = null;
+
 function formatOpsDate(iso) {
   const d = new Date(iso);
   if (isNaN(d)) return iso || "";
@@ -24,8 +28,14 @@ function renderDashboard(data) {
       <td>${escapeHtml(r.title)}</td>
       <td>${escapeHtml(r.senderName)} &lt;${escapeHtml(r.senderEmail)}&gt;</td>
       <td>${formatOpsDate(r.timestamp)}</td>
+      <td>
+        ${r.emailVerified
+          ? `<button type="button" class="btn-secondary approve-btn" data-row="${r.rowIndex}">Approve</button>`
+          : `<span class="status-msg error" style="margin:0">No verified email for ${escapeHtml(r.targetMinister)}</span>`}
+        <div class="status-msg" data-row-status="${r.rowIndex}"></div>
+      </td>
     </tr>
-  `).join("") || `<tr><td colspan="3">Nothing pending.</td></tr>`;
+  `).join("") || `<tr><td colspan="4">Nothing pending.</td></tr>`;
 
   el.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;margin:28px 0">
@@ -62,12 +72,48 @@ function renderDashboard(data) {
     <div class="panel">
       <h2>Submissions awaiting review</h2>
       <table class="table">
-        <thead><tr><th>Title</th><th>Submitted by</th><th>Date</th></tr></thead>
+        <thead><tr><th>Title</th><th>Submitted by</th><th>Date</th><th>Review</th></tr></thead>
         <tbody>${pendingRows}</tbody>
       </table>
-      <p class="hint" style="margin-top:14px">Review these in the Google Sheet's "Campaign Requests" tab — mark a Status there once you've acted on it.</p>
+      <p class="hint" style="margin-top:14px">Approve drafts a letter and opens a GitHub pull request adding it to campaigns.json — merging that PR is what makes it live. You can also review directly in the Google Sheet's "Campaign Requests" tab.</p>
     </div>
   `;
+
+  el.querySelectorAll(".approve-btn").forEach(btn => {
+    btn.addEventListener("click", () => handleApproveClick(btn.dataset.row, btn));
+  });
+}
+
+async function handleApproveClick(rowIndex, btn) {
+  const statusEl = document.querySelector(`[data-row-status="${rowIndex}"]`);
+  btn.disabled = true;
+  btn.textContent = "Drafting letter…";
+  statusEl.className = "status-msg";
+  statusEl.textContent = "";
+
+  try {
+    const url = `${window.APPS_SCRIPT_URL}?credential=${encodeURIComponent(currentIdToken)}&action=approve&row=${encodeURIComponent(rowIndex)}`;
+    const res = await fetch(url);
+    const result = await res.json();
+
+    if (!result.ok) {
+      btn.disabled = false;
+      btn.textContent = "Approve";
+      statusEl.className = "status-msg error";
+      statusEl.textContent = result.error + (result.reasonDetail ? ` — ${result.reasonDetail}` : "");
+      return;
+    }
+
+    btn.remove();
+    statusEl.className = "status-msg ok";
+    statusEl.innerHTML = `<a href="${result.prUrl}" target="_blank" rel="noopener">PR opened — review &amp; merge to go live →</a>`;
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = "Approve";
+    statusEl.className = "status-msg error";
+    statusEl.textContent = "Couldn't reach the ops endpoint — try again.";
+    console.error(err);
+  }
 }
 
 async function fetchOpsData(idToken) {
@@ -77,6 +123,7 @@ async function fetchOpsData(idToken) {
 }
 
 function handleCredentialResponse(response) {
+  currentIdToken = response.credential;
   const authStatus = document.getElementById("authStatus");
   authStatus.className = "status-msg";
   authStatus.textContent = "Checking authorisation…";

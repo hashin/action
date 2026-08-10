@@ -1,6 +1,6 @@
 # Setup guide for action.hashin.me
 
-Four one-time setup steps (the fourth is optional). Do them in this order.
+Five one-time setup steps (the fourth and fifth are optional). Do them in this order.
 
 ## 1. Google Sheet + Apps Script (stores sender submissions — free, no server)
 
@@ -79,6 +79,37 @@ Google account — access is checked server-side on every request, not just in t
 5. Paste the **same** Client ID into [`apps-script/Code.gs`](../apps-script/Code.gs) (`GOOGLE_CLIENT_ID` near the top), and edit `ALLOWED_OPS_EMAILS` to list exactly which Google accounts may view the dashboard.
 6. Redeploy the script: **Deploy → Manage deployments → Edit (pencil) → New version → Deploy** — same step as any other `Code.gs` change.
 7. Commit and push the `config.js` change, then visit `https://action.hashin.me/ops.html` and sign in. (You'll see an "unverified app" warning during sign-in while the OAuth consent screen is in Testing status — that's expected for your own app; click through it.)
+8. **Important, easy to miss:** pasting `Code.gs` into GitHub does *not* update the live script — it's a separate copy running on Google's servers. Every time you change `Code.gs`, you must also paste it into the Apps Script editor and redeploy (step 6) for the change to take effect.
+9. The first time `Code.gs` calls an external service it hasn't called before (`UrlFetchApp`, used for verifying sign-in and, if you set up part 5, for GitHub/Gemini), Google won't have granted that permission yet, and every request will fail with `You do not have permission to call UrlFetchApp.fetch`. Redeploying doesn't trigger the consent prompt by itself — you have to run something that uses it once, manually: temporarily add
+   ```js
+   function testAuth() { UrlFetchApp.fetch("https://oauth2.googleapis.com/tokeninfo?id_token=test"); }
+   ```
+   anywhere in the file, select `testAuth` from the function dropdown in the toolbar, click **Run**, and approve the permissions dialog (**Review permissions → your account → Advanced → Go to [project name] (unsafe) → Allow** — expected, since it's your own unverified script). It'll finish with a harmless error (the fake token gets rejected) — that's fine, the point was just granting the permission. Delete `testAuth` afterwards.
+
+## 5. Approving campaigns from the ops dashboard (optional)
+
+With this set up, the "Approve" button next to a pending "Start a Campaign" submission on
+`ops.html` drafts a formal letter (matching the site's existing tone) using Gemini, and opens a
+GitHub pull request adding it to `data/campaigns.json`. **Nothing goes live automatically** —
+merging that PR is the actual publish step, so you always get a chance to read the AI-drafted
+letter before a real minister sees it. Approve is disabled for any submission whose target
+minister still has a `"FILL_ME"` placeholder email in `data/ministers.json`.
+
+This needs two secrets. Both go in the Apps Script editor's **Project Settings → Script
+Properties** — never paste either into `Code.gs` itself, since that file is committed to a
+public GitHub repo.
+
+1. Get a free Gemini API key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (Google AI Studio — no billing required for the free tier this uses).
+2. Create a GitHub **fine-grained personal access token** at [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new):
+   - Repository access: **Only select repositories** → `hashin/action`.
+   - Permissions: **Contents** → Read and write, **Pull requests** → Read and write.
+   - Set an expiry (90 days is reasonable) — you'll get an email reminder to renew it before Approve stops working.
+3. In the Apps Script editor, open **Project Settings** (gear icon, left sidebar) → **Script Properties → Add script property**, and add two:
+   - `GEMINI_API_KEY` = the key from step 1
+   - `GITHUB_TOKEN` = the token from step 2
+4. That's it — no redeploy needed for Script Properties changes (they're read at request time). Try Approve on a pending submission whose minister has a real email.
+
+If you ever need to revoke access, delete the Script Property or the GitHub token — Approve will fail with a clear "isn't set" error rather than silently doing nothing.
 
 ## How submissions are organised
 
