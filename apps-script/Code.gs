@@ -24,6 +24,11 @@
 // anyone who looks — just enough to stop non-targeted spam bots.
 const SHARED_TOKEN = "JdKbkmiaOIO41uUqgrTpaPO2LL-4evwC";
 
+// Ops dashboard (ops.html) access — this one IS real security, unlike SHARED_TOKEN above.
+// Must exactly match GOOGLE_CLIENT_ID in assets/js/config.js. See docs/SETUP.md, part 4.
+const GOOGLE_CLIENT_ID = "PASTE_YOUR_CLIENT_ID.apps.googleusercontent.com";
+const ALLOWED_OPS_EMAILS = ["sneha4luvn@gmail.com"]; // add more Google accounts here to grant access
+
 const FALLBACK_SHEET_NAME = "Submissions"; // used only if a send has no campaign title/slug at all
 const SEND_HEADERS = [
   "Timestamp", "Sender Name", "Sender Email", "Sender Phone", "Constituency",
@@ -84,6 +89,108 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
       .setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+// ---------- Ops dashboard (ops.html) — read-only, gated by Google sign-in ----------
+
+function doGet(e) {
+  try {
+    const idToken = e.parameter.credential;
+    if (!idToken) {
+      return jsonOutput({ ok: false, error: "missing credential" });
+    }
+
+    const email = verifyGoogleIdToken(idToken);
+    if (!email || ALLOWED_OPS_EMAILS.indexOf(email) === -1) {
+      return jsonOutput({ ok: false, error: "unauthorized" });
+    }
+
+    return jsonOutput({ ok: true, data: buildOpsSnapshot() });
+  } catch (err) {
+    return jsonOutput({ ok: false, error: String(err) });
+  }
+}
+
+function jsonOutput(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// Verifies a Google Identity Services ID token server-side via Google's tokeninfo endpoint
+// (Apps Script has no JWT library). Confirms the token is genuine, was issued for our own
+// OAuth client (not some other app), and carries a verified email — then returns that email.
+function verifyGoogleIdToken(idToken) {
+  const res = UrlFetchApp.fetch(
+    "https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(idToken),
+    { muteHttpExceptions: true }
+  );
+  if (res.getResponseCode() !== 200) return null;
+  const payload = JSON.parse(res.getContentText());
+  if (payload.aud !== GOOGLE_CLIENT_ID) return null;
+  if (payload.email_verified !== "true" && payload.email_verified !== true) return null;
+  return payload.email || null;
+}
+
+// Aggregates real counts from the Sheet — nothing here is estimated or fabricated. Ministry
+// reply status isn't tracked anywhere in this Sheet, so it's intentionally left out rather
+// than guessed at.
+function buildOpsSnapshot() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const receivedAtCol = SEND_HEADERS.length - 1; // "Received At (Server)" is always the last column
+  const constituencyCol = SEND_HEADERS.indexOf("Constituency");
+
+  let totalSent = 0;
+  let sentThisWeek = 0;
+  const campaigns = [];
+
+  ss.getSheets().forEach(function (sheet) {
+    const name = sheet.getName();
+    if (name === CAMPAIGN_REQUESTS_SHEET_NAME) return;
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      campaigns.push({ title: name, sent: 0, uniqueConstituencies: 0 });
+      return;
+    }
+
+    const rows = sheet.getRange(2, 1, lastRow - 1, SEND_HEADERS.length).getValues();
+    const constituencies = {};
+    let thisWeek = 0;
+
+    rows.forEach(function (row) {
+      const constituency = row[constituencyCol];
+      if (constituency) constituencies[String(constituency)] = true;
+      const receivedAt = row[receivedAtCol];
+      if (receivedAt instanceof Date && receivedAt >= weekAgo) thisWeek++;
+    });
+
+    totalSent += rows.length;
+    sentThisWeek += thisWeek;
+    campaigns.push({ title: name, sent: rows.length, uniqueConstituencies: Object.keys(constituencies).length });
+  });
+
+  campaigns.sort(function (a, b) { return b.sent - a.sent; });
+
+  const pendingRequests = [];
+  const reqSheet = ss.getSheetByName(CAMPAIGN_REQUESTS_SHEET_NAME);
+  if (reqSheet && reqSheet.getLastRow() >= 2) {
+    const statusCol = CAMPAIGN_REQUESTS_HEADERS.indexOf("Status");
+    const rows = reqSheet.getRange(2, 1, reqSheet.getLastRow() - 1, CAMPAIGN_REQUESTS_HEADERS.length).getValues();
+    rows.forEach(function (row) {
+      if (String(row[statusCol] || "").trim() !== "") return; // already reviewed
+      pendingRequests.push({
+        timestamp: row[0] instanceof Date ? row[0].toISOString() : String(row[0] || ""),
+        title: String(row[2] || ""),
+        category: String(row[3] || ""),
+        targetMinister: String(row[4] || ""),
+        senderName: String(row[7] || ""),
+        senderEmail: String(row[8] || ""),
+        constituency: String(row[10] || "")
+      });
+    });
+  }
+
+  return { totalSent: totalSent, sentThisWeek: sentThisWeek, campaigns: campaigns, pendingRequests: pendingRequests };
 }
 
 // Google Sheets tab names can't contain [ ] * ? / \ : , can't be blank, can't exceed 100

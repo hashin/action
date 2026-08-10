@@ -1,6 +1,6 @@
 # Setup guide for action.hashin.me
 
-Three one-time setup steps. Do them in this order.
+Four one-time setup steps (the fourth is optional). Do them in this order.
 
 ## 1. Google Sheet + Apps Script (stores sender submissions — free, no server)
 
@@ -49,6 +49,36 @@ After pushing, in the repo on GitHub go to **Settings → Pages** and confirm:
 - Once GitHub verifies DNS (can take up to ~24h after step 2), tick **Enforce HTTPS**.
 
 That's it — visiting `https://action.hashin.me` should show the site.
+
+## 4. Ops dashboard (optional — Google sign-in for internal stats)
+
+`ops.html` shows live counts (total letters sent, this week, campaign breakdown, pending
+"Start a Campaign" proposals) pulled from the Sheet. It isn't linked from the public site, and
+even if someone finds the URL, they can't see any data without signing in with an authorised
+Google account — access is checked server-side on every request, not just in the page's JS.
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com), and create (or select) a project.
+2. Go to **APIs & Services → OAuth consent screen**.
+   - User type: **External**.
+   - App name: `Action Ops` (or anything — only you and people you approve will see this).
+   - Add a support email (yours).
+   - Under **Test users**, add every Google account that should be able to sign in — e.g.
+     `sneha4luvn@gmail.com`, and your own if you want access too. While the app is in
+     **Testing** status (the default — no need to publish it), sign-in only works for accounts
+     on this list, which is a useful second layer on top of the allowlist in step 5.
+3. Go to **APIs & Services → Credentials → Create credentials → OAuth client ID**.
+   - Application type: **Web application**.
+   - Name: `Action Ops Dashboard`.
+   - Authorized JavaScript origins: add `https://action.hashin.me`.
+   - Leave **Authorized redirect URIs** empty — Google Identity Services' sign-in button doesn't need one.
+   - Click **Create** and copy the **Client ID** (ends in `.apps.googleusercontent.com`).
+4. Paste that Client ID into [`assets/js/config.js`](../assets/js/config.js):
+   ```js
+   window.GOOGLE_CLIENT_ID = "XXXXXXXX.apps.googleusercontent.com";
+   ```
+5. Paste the **same** Client ID into [`apps-script/Code.gs`](../apps-script/Code.gs) (`GOOGLE_CLIENT_ID` near the top), and edit `ALLOWED_OPS_EMAILS` to list exactly which Google accounts may view the dashboard.
+6. Redeploy the script: **Deploy → Manage deployments → Edit (pencil) → New version → Deploy** — same step as any other `Code.gs` change.
+7. Commit and push the `config.js` change, then visit `https://action.hashin.me/ops.html` and sign in. (You'll see an "unverified app" warning during sign-in while the OAuth consent screen is in Testing status — that's expected for your own app; click through it.)
 
 ## How submissions are organised
 

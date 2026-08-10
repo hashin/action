@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Ops — action.hashin.me</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="index.html">
+      <span class="mark">A</span>
+      <span class="name">action.hashin.me &mdash; Ops</span>
+    </a>
+    <span class="badge outline">Internal only</span>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <section class="hero" style="border-bottom:none;margin-bottom:0">
+      <h1 style="font-size:28px">Campaign operations</h1>
+      <p>Live counts pulled from the submissions Sheet. Visible only to authorised Google accounts.</p>
+    </section>
+
+    <div id="signinGate" style="text-align:center;padding:48px 0">
+      <div id="gsiButton" style="display:inline-block"></div>
+      <p class="status-msg" id="authStatus"></p>
+    </div>
+
+    <div id="dashboard" style="display:none"></div>
+  </div>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <p>Not linked from the public site. Access is checked again on the server for every request &mdash; a copied link alone can't get anyone in.</p>
+  </div>
+</footer>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/ops.js"></script>
+</body>
+</html>

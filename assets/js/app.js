@@ -148,6 +148,47 @@ async function submitToSheet(payload) {
   }
 }
 
+function campaignUrl(slug) {
+  return `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, "")}campaign.html?c=${encodeURIComponent(slug)}`;
+}
+
+// Shown in place of the send form right after a visitor triggers mailto: or the Gmail
+// fallback. We can't detect whether they actually pressed Send in their mail app — same
+// optimistic assumption the inline status message already made — so this fires immediately
+// rather than waiting for confirmation that doesn't exist.
+function renderSentConfirmation(campaign, root) {
+  root.innerHTML = `
+    <a class="back-link" href="index.html">&larr; All campaigns</a>
+    <div class="detail-header" style="text-align:center">
+      <h1>Your letter is on its way to ${escapeHtml(campaign.minister.name)}.</h1>
+      <p class="to-line" style="margin:0 auto 8px;max-width:56ch">A copy stays in your own mail app — nothing more to do here.</p>
+    </div>
+    <div class="panel" style="text-align:center">
+      <h2>Help this reach more people</h2>
+      <p class="hint" style="margin-bottom:18px">Share this campaign so more people from your constituency add their name.</p>
+      <div class="secondary-row">
+        <button type="button" class="btn-secondary" id="shareWhatsapp">Share on WhatsApp</button>
+        <button type="button" class="btn-secondary" id="copyLinkBtn">Copy link</button>
+      </div>
+      <p class="status-msg" id="shareStatus"></p>
+    </div>
+  `;
+
+  document.getElementById("shareWhatsapp").addEventListener("click", () => {
+    const text = `${campaign.title} — add your name: ${campaignUrl(campaign.slug)}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+  });
+
+  document.getElementById("copyLinkBtn").addEventListener("click", async () => {
+    const ok = await copyToClipboard(campaignUrl(campaign.slug));
+    const el = document.getElementById("shareStatus");
+    el.className = ok ? "status-msg ok" : "status-msg error";
+    el.textContent = ok
+      ? "Link copied."
+      : "Couldn't copy — copy the URL from your address bar instead.";
+  });
+}
+
 async function renderCampaignPage() {
   const root = document.getElementById("campaignRoot");
   const slug = getQueryParam("c");
@@ -299,10 +340,16 @@ async function renderCampaignPage() {
     });
 
     window.location.href = mailto;
-    statusEl.className = "status-msg ok";
-    statusEl.textContent = isMobileDevice()
-      ? "Your mail app should now open with the letter ready — press Send there to finish."
-      : "Your default mail app should now open with the letter ready — press Send there to finish. Nothing happened? Most desktop browsers without a mail app set up need the options below instead.";
+
+    // mailto: reliably opens a mail app on mobile, so we can confirm optimistically there.
+    // On desktop, a missing mail-app handler fails silently — keep the form and fallback
+    // buttons (Gmail / copy) visible instead of claiming success.
+    if (isMobileDevice()) {
+      renderSentConfirmation(campaign, root);
+    } else {
+      statusEl.className = "status-msg ok";
+      statusEl.textContent = "Your default mail app should now open with the letter ready — press Send there to finish. Nothing happened? Use the options below instead.";
+    }
   });
 
   document.getElementById("gmailBtn").addEventListener("click", () => {
@@ -320,8 +367,7 @@ async function renderCampaignPage() {
     });
 
     window.open(gmailUrl, "_blank", "noopener");
-    statusEl.className = "status-msg ok";
-    statusEl.textContent = "Gmail should now be open in a new tab with your letter ready — press Send there to finish.";
+    renderSentConfirmation(campaign, root);
   });
 
   document.getElementById("copyBtn").addEventListener("click", async () => {
