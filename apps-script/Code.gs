@@ -26,8 +26,8 @@ const SHARED_TOKEN = "JdKbkmiaOIO41uUqgrTpaPO2LL-4evwC";
 
 // Ops dashboard (ops.html) access — this one IS real security, unlike SHARED_TOKEN above.
 // Must exactly match GOOGLE_CLIENT_ID in assets/js/config.js. See docs/SETUP.md, part 4.
-const GOOGLE_CLIENT_ID = "PASTE_YOUR_CLIENT_ID.apps.googleusercontent.com";
-const ALLOWED_OPS_EMAILS = ["sneha4luvn@gmail.com"]; // add more Google accounts here to grant access
+const GOOGLE_CLIENT_ID = "730575915949-6lhke3abh9c67p0cqarup9d6r5l2c85j.apps.googleusercontent.com";
+const ALLOWED_OPS_EMAILS = ["sneha4luvn@gmail.com", "hashjith@gmail.com"]; // add more Google accounts here to grant access
 
 const FALLBACK_SHEET_NAME = "Submissions"; // used only if a send has no campaign title/slug at all
 const SEND_HEADERS = [
