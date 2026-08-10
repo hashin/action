@@ -74,6 +74,16 @@ function buildMailtoUrl({ to, cc, subject, body }) {
   return `mailto:${encodeURIComponent(to)}?${params.toString().replace(/\+/g, "%20")}`;
 }
 
+// mailto: only works if the visitor's OS/browser has a mail client registered as the
+// default handler — most people using Gmail purely in-browser have nothing registered,
+// so mailto: silently does nothing for them. Gmail's compose URL works for anyone signed
+// into Gmail in their browser (the common case for this audience) and needs no handler.
+function buildGmailComposeUrl({ to, cc, subject, body }) {
+  const params = new URLSearchParams({ view: "cm", fs: "1", to, su: subject, body });
+  if (cc && cc.length) params.set("cc", cc.join(","));
+  return `https://mail.google.com/mail/?${params.toString()}`;
+}
+
 async function submitToSheet(payload) {
   if (!window.APPS_SCRIPT_URL) return; // logging is optional
   try {
@@ -164,9 +174,10 @@ async function renderCampaignPage() {
         <p class="hint">Edit freely — this is exactly what will be sent.</p>
       </div>
 
-      <button type="submit" class="send-btn">Send email to ${escapeHtml(campaign.minister.name)}</button>
+      <button type="submit" class="send-btn">Open in Gmail to send to ${escapeHtml(campaign.minister.name)}</button>
+      <button type="button" class="secondary-link" id="mailAppBtn">Or use your device's mail app instead</button>
       <p class="status-msg" id="statusMsg"></p>
-      <p class="privacy-note">Clicking send opens your own email app with this letter pre-filled — you press the final Send yourself. We record your name, constituency and contact details only to track campaign participation.</p>
+      <p class="privacy-note">This opens a compose window addressed to the minister's office with your letter pre-filled — you press Send yourself. We record your name, constituency and contact details only to track campaign participation.</p>
     </form>
   `;
 
@@ -185,11 +196,7 @@ async function renderCampaignPage() {
   nameEl.addEventListener("input", refreshLetter);
   constEl.addEventListener("change", refreshLetter);
 
-  document.getElementById("sendForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    statusEl.className = "status-msg";
-    statusEl.textContent = "";
-
+  function gatherAndValidate() {
     const senderName = nameEl.value.trim();
     const senderEmail = document.getElementById("senderEmail").value.trim();
     const senderPhone = document.getElementById("senderPhone").value.trim();
@@ -198,7 +205,7 @@ async function renderCampaignPage() {
     if (!senderName || !senderEmail || !constituency) {
       statusEl.className = "status-msg error";
       statusEl.textContent = "Please fill in your name, email, and constituency.";
-      return;
+      return null;
     }
 
     const finalSubject = substitute(campaign.subject, { sender_name: senderName, constituency, date: todayHuman() });
@@ -215,15 +222,45 @@ async function renderCampaignPage() {
       timestamp: new Date().toISOString()
     });
 
+    return { senderName, senderEmail, senderPhone, constituency, finalSubject, finalBody };
+  }
+
+  document.getElementById("sendForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    statusEl.className = "status-msg";
+    statusEl.textContent = "";
+
+    const data = gatherAndValidate();
+    if (!data) return;
+
+    const gmailUrl = buildGmailComposeUrl({
+      to: campaign.minister.email,
+      cc: campaign.minister.cc || [],
+      subject: data.finalSubject,
+      body: data.finalBody
+    });
+
+    window.open(gmailUrl, "_blank", "noopener");
+    statusEl.className = "status-msg ok";
+    statusEl.textContent = "Gmail should now be open in a new tab with your letter ready — press Send there to finish. Didn't open? Check your pop-up blocker, or use the link below.";
+  });
+
+  document.getElementById("mailAppBtn").addEventListener("click", () => {
+    statusEl.className = "status-msg";
+    statusEl.textContent = "";
+
+    const data = gatherAndValidate();
+    if (!data) return;
+
     const mailto = buildMailtoUrl({
       to: campaign.minister.email,
       cc: campaign.minister.cc || [],
-      subject: finalSubject,
-      body: finalBody
+      subject: data.finalSubject,
+      body: data.finalBody
     });
 
     window.location.href = mailto;
     statusEl.className = "status-msg ok";
-    statusEl.textContent = "Your email app should now be open with the letter ready — press Send there to finish.";
+    statusEl.textContent = "Your device's mail app should now open with the letter ready — press Send there to finish.";
   });
 }

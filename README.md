@@ -1,14 +1,19 @@
 # action.hashin.me
 
 A free, static "write to your minister" site: visitors pick a campaign, review a drafted
-letter, fill in their name/contact/constituency, and send it to the target office in one click
-via their own email app (`mailto:`). No visitor registration. No paid backend.
+letter, fill in their name/contact/constituency, and send it to the target office in one click.
+No visitor registration. No paid backend.
 
 ## Stack (all free)
 
 - **Hosting:** GitHub Pages (this repo), custom domain `action.hashin.me`.
-- **Sending:** `mailto:` links — opens the visitor's own email client, pre-filled; they press
-  Send themselves. Nothing is sent from a server.
+- **Sending:** primary button opens a **Gmail compose window** pre-filled (works for anyone
+  signed into Gmail in their browser — the common case for this audience, and needs no
+  registered mail handler). A secondary "use your device's mail app" link falls back to a
+  `mailto:` link for people with a desktop client. Either way, the visitor presses Send
+  themselves — nothing is sent from a server. (Plain `mailto:` alone silently does nothing for
+  visitors with no default mail app registered, which is most browser-only Gmail users — that's
+  why Gmail compose is the primary path.)
 - **Storage:** a Google Sheet, written to in the background via a Google Apps Script Web App
   (free, no server to run or pay for). Visitors never see the Sheet — only a normal form.
 - **Letters:** pre-written per campaign (see the `create-campaign` skill below) rather than a
