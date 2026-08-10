@@ -102,6 +102,10 @@ function doGet(e) {
 
     const email = verifyGoogleIdToken(idToken);
     if (!email || ALLOWED_OPS_EMAILS.indexOf(email) === -1) {
+      // Not exposed in the HTTP response (stays generic there on purpose) — check
+      // this script's Executions log (left sidebar → Executions) to see exactly why
+      // a given sign-in was rejected.
+      Logger.log("ops doGet rejected: resolvedEmail=%s allowedEmails=%s", email, JSON.stringify(ALLOWED_OPS_EMAILS));
       return jsonOutput({ ok: false, error: "unauthorized" });
     }
 
@@ -123,10 +127,19 @@ function verifyGoogleIdToken(idToken) {
     "https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(idToken),
     { muteHttpExceptions: true }
   );
-  if (res.getResponseCode() !== 200) return null;
+  if (res.getResponseCode() !== 200) {
+    Logger.log("ops tokeninfo call failed: status=%s body=%s", res.getResponseCode(), res.getContentText());
+    return null;
+  }
   const payload = JSON.parse(res.getContentText());
-  if (payload.aud !== GOOGLE_CLIENT_ID) return null;
-  if (payload.email_verified !== "true" && payload.email_verified !== true) return null;
+  if (payload.aud !== GOOGLE_CLIENT_ID) {
+    Logger.log("ops token aud mismatch: tokenAud=%s expectedAud=%s", payload.aud, GOOGLE_CLIENT_ID);
+    return null;
+  }
+  if (payload.email_verified !== "true" && payload.email_verified !== true) {
+    Logger.log("ops token email not verified: email=%s email_verified=%s", payload.email, payload.email_verified);
+    return null;
+  }
   return payload.email || null;
 }
 
