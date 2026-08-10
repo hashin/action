@@ -100,13 +100,13 @@ function doGet(e) {
       return jsonOutput({ ok: false, error: "missing credential" });
     }
 
-    const email = verifyGoogleIdToken(idToken);
-    if (!email || ALLOWED_OPS_EMAILS.indexOf(email) === -1) {
-      // Not exposed in the HTTP response (stays generic there on purpose) — check
-      // this script's Executions log (left sidebar → Executions) to see exactly why
-      // a given sign-in was rejected.
-      Logger.log("ops doGet rejected: resolvedEmail=%s allowedEmails=%s", email, JSON.stringify(ALLOWED_OPS_EMAILS));
-      return jsonOutput({ ok: false, error: "unauthorized" });
+    const verified = verifyGoogleIdToken(idToken);
+    if (!verified.email || ALLOWED_OPS_EMAILS.indexOf(verified.email) === -1) {
+      // TEMPORARY: reasonDetail exposes why a sign-in was rejected (mismatched Client ID vs.
+      // an email genuinely not on the allowlist) so it's visible right on ops.html instead of
+      // digging through the Executions log. Only reachable by someone who already completed a
+      // real Google sign-in against our OAuth client — remove once ops.html works reliably.
+      return jsonOutput({ ok: false, error: "unauthorized", reasonDetail: verified.reason });
     }
 
     return jsonOutput({ ok: true, data: buildOpsSnapshot() });
@@ -128,19 +128,16 @@ function verifyGoogleIdToken(idToken) {
     { muteHttpExceptions: true }
   );
   if (res.getResponseCode() !== 200) {
-    Logger.log("ops tokeninfo call failed: status=%s body=%s", res.getResponseCode(), res.getContentText());
-    return null;
+    return { email: null, reason: "tokeninfo call failed: status=" + res.getResponseCode() + " body=" + res.getContentText() };
   }
   const payload = JSON.parse(res.getContentText());
   if (payload.aud !== GOOGLE_CLIENT_ID) {
-    Logger.log("ops token aud mismatch: tokenAud=%s expectedAud=%s", payload.aud, GOOGLE_CLIENT_ID);
-    return null;
+    return { email: null, reason: "aud mismatch: tokenAud=" + payload.aud + " expectedAud=" + GOOGLE_CLIENT_ID };
   }
   if (payload.email_verified !== "true" && payload.email_verified !== true) {
-    Logger.log("ops token email not verified: email=%s email_verified=%s", payload.email, payload.email_verified);
-    return null;
+    return { email: null, reason: "email not verified: email=" + payload.email };
   }
-  return payload.email || null;
+  return { email: payload.email || null, reason: "email=" + payload.email + " allowedEmails=" + JSON.stringify(ALLOWED_OPS_EMAILS) };
 }
 
 // Aggregates real counts from the Sheet — nothing here is estimated or fabricated. Ministry

@@ -84,7 +84,10 @@ function handleCredentialResponse(response) {
   fetchOpsData(response.credential).then(result => {
     if (!result.ok) {
       authStatus.className = "status-msg error";
-      authStatus.textContent = "This Google account isn't authorised to view the ops dashboard.";
+      // reasonDetail is a temporary debug aid — see the TEMPORARY comment on the
+      // matching Code.gs check for how to remove it once sign-in works reliably.
+      authStatus.textContent = "This Google account isn't authorised to view the ops dashboard."
+        + (result.reasonDetail ? ` (${result.reasonDetail})` : "");
       return;
     }
     document.getElementById("signinGate").style.display = "none";
