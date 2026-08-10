@@ -246,6 +246,14 @@ textarea#letterPreview {
 .send-btn:hover { background: var(--brand-dark); }
 .send-btn:disabled { background: #a7b8b0; cursor: not-allowed; }
 
+.secondary-row {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
 .secondary-link {
   appearance: none;
   border: none;
@@ -254,10 +262,7 @@ textarea#letterPreview {
   font-size: 13.5px;
   text-decoration: underline;
   cursor: pointer;
-  display: block;
-  width: 100%;
-  text-align: center;
-  padding: 10px 0 0;
+  padding: 4px 0;
 }
 .secondary-link:hover { color: var(--brand-dark); }
 

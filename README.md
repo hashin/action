@@ -7,13 +7,14 @@ No visitor registration. No paid backend.
 ## Stack (all free)
 
 - **Hosting:** GitHub Pages (this repo), custom domain `action.hashin.me`.
-- **Sending:** primary button opens a **Gmail compose window** pre-filled (works for anyone
-  signed into Gmail in their browser — the common case for this audience, and needs no
-  registered mail handler). A secondary "use your device's mail app" link falls back to a
-  `mailto:` link for people with a desktop client. Either way, the visitor presses Send
-  themselves — nothing is sent from a server. (Plain `mailto:` alone silently does nothing for
-  visitors with no default mail app registered, which is most browser-only Gmail users — that's
-  why Gmail compose is the primary path.)
+- **Sending:** primary button is a plain `mailto:` link, pre-filled. Most visitors are expected
+  to be on a phone, where mailto: reliably opens whatever mail app is already installed and set
+  as the OS handler — Gmail, Outlook, Yahoo, a carrier app, anything — so this works for
+  everyone, not just Gmail users. Two secondary options cover the remaining cases: "Open in
+  Gmail" (a Gmail compose window, for desktop browsers with no mail app registered but a
+  signed-in Gmail session) and "Copy letter to paste elsewhere" (copies To/Subject/body to the
+  clipboard, for any other webmail or app). Whichever path, the visitor presses Send
+  themselves — nothing is sent from a server.
 - **Storage:** a Google Sheet, written to in the background via a Google Apps Script Web App
   (free, no server to run or pay for). Visitors never see the Sheet — only a normal form.
 - **Letters:** pre-written per campaign (see the `create-campaign` skill below) rather than a

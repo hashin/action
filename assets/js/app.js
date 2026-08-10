@@ -32,6 +32,37 @@ function badgeLabel(status) {
   return "Demo";
 }
 
+// Most visitors will be on a phone, where mailto: reliably opens whatever mail app
+// (Gmail, Outlook, Yahoo, a carrier app — anything) is already set up as the OS handler.
+// On desktop that handler is often missing, so we adjust the helper text accordingly.
+function isMobileDevice() {
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 1 && /Mac/i.test(navigator.platform)); // iPadOS reports as Mac
+}
+
+async function copyToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (err) { /* fall through to legacy method */ }
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch (err) {
+    return false;
+  }
+}
+
 // ---------- Homepage ----------
 
 async function renderHomepage() {
@@ -93,10 +124,10 @@ function buildMailtoUrl({ to, cc, subject, body }) {
   return `mailto:${encodeURIComponent(to)}?${params.toString().replace(/\+/g, "%20")}`;
 }
 
-// mailto: only works if the visitor's OS/browser has a mail client registered as the
-// default handler — most people using Gmail purely in-browser have nothing registered,
-// so mailto: silently does nothing for them. Gmail's compose URL works for anyone signed
-// into Gmail in their browser (the common case for this audience) and needs no handler.
+// Gmail-specific fallback for the minority of visitors (mostly on desktop) whose browser
+// has no mail app registered for mailto:, but who are signed into Gmail in that browser.
+// Not the primary path — it only helps Gmail users, and most visitors are on phones where
+// mailto: already works via whatever mail app they have installed.
 function buildGmailComposeUrl({ to, cc, subject, body }) {
   const params = new URLSearchParams({ view: "cm", fs: "1", to, su: subject, body });
   if (cc && cc.length) params.set("cc", cc.join(","));
@@ -154,7 +185,7 @@ async function renderCampaignPage() {
     <div class="detail-header">
       <span class="badge ${badgeClass(campaign.status)}">${badgeLabel(campaign.status)}</span>
       <h1>${escapeHtml(campaign.title)}</h1>
-      <div class="to-line">To: <strong>${escapeHtml(campaign.minister.name)}</strong> &mdash; ${escapeHtml(campaign.minister.designation || "")}</div>
+      <div class="to-line">To: <strong>${escapeHtml(campaign.minister.name)}</strong> &mdash; ${escapeHtml(campaign.minister.designation || "")} &lt;${escapeHtml(campaign.minister.email)}&gt;</div>
     </div>
     ${demoBanner}
     <div class="panel">
@@ -193,10 +224,13 @@ async function renderCampaignPage() {
         <p class="hint">Edit freely — this is exactly what will be sent.</p>
       </div>
 
-      <button type="submit" class="send-btn">Open in Gmail to send to ${escapeHtml(campaign.minister.name)}</button>
-      <button type="button" class="secondary-link" id="mailAppBtn">Or use your device's mail app instead</button>
+      <button type="submit" class="send-btn">Send email to ${escapeHtml(campaign.minister.name)}</button>
+      <div class="secondary-row">
+        <button type="button" class="secondary-link" id="gmailBtn">Open in Gmail instead</button>
+        <button type="button" class="secondary-link" id="copyBtn">Copy letter to paste elsewhere</button>
+      </div>
       <p class="status-msg" id="statusMsg"></p>
-      <p class="privacy-note">This opens a compose window addressed to the minister's office with your letter pre-filled — you press Send yourself. We record your name, constituency and contact details only to track campaign participation.</p>
+      <p class="privacy-note">Sending opens your mail app (or, on some desktop browsers, a Gmail compose window) with this letter pre-filled — you press Send yourself. We record your name, constituency and contact details only to track campaign participation.</p>
     </form>
   `;
 
@@ -257,25 +291,6 @@ async function renderCampaignPage() {
     const data = gatherAndValidate();
     if (!data) return;
 
-    const gmailUrl = buildGmailComposeUrl({
-      to: campaign.minister.email,
-      cc: campaign.minister.cc || [],
-      subject: data.finalSubject,
-      body: data.finalBody
-    });
-
-    window.open(gmailUrl, "_blank", "noopener");
-    statusEl.className = "status-msg ok";
-    statusEl.textContent = "Gmail should now be open in a new tab with your letter ready — press Send there to finish. Didn't open? Check your pop-up blocker, or use the link below.";
-  });
-
-  document.getElementById("mailAppBtn").addEventListener("click", () => {
-    statusEl.className = "status-msg";
-    statusEl.textContent = "";
-
-    const data = gatherAndValidate();
-    if (!data) return;
-
     const mailto = buildMailtoUrl({
       to: campaign.minister.email,
       cc: campaign.minister.cc || [],
@@ -285,6 +300,42 @@ async function renderCampaignPage() {
 
     window.location.href = mailto;
     statusEl.className = "status-msg ok";
-    statusEl.textContent = "Your device's mail app should now open with the letter ready — press Send there to finish.";
+    statusEl.textContent = isMobileDevice()
+      ? "Your mail app should now open with the letter ready — press Send there to finish."
+      : "Your default mail app should now open with the letter ready — press Send there to finish. Nothing happened? Most desktop browsers without a mail app set up need the options below instead.";
+  });
+
+  document.getElementById("gmailBtn").addEventListener("click", () => {
+    statusEl.className = "status-msg";
+    statusEl.textContent = "";
+
+    const data = gatherAndValidate();
+    if (!data) return;
+
+    const gmailUrl = buildGmailComposeUrl({
+      to: campaign.minister.email,
+      cc: campaign.minister.cc || [],
+      subject: data.finalSubject,
+      body: data.finalBody
+    });
+
+    window.open(gmailUrl, "_blank", "noopener");
+    statusEl.className = "status-msg ok";
+    statusEl.textContent = "Gmail should now be open in a new tab with your letter ready — press Send there to finish.";
+  });
+
+  document.getElementById("copyBtn").addEventListener("click", async () => {
+    statusEl.className = "status-msg";
+    statusEl.textContent = "";
+
+    const data = gatherAndValidate();
+    if (!data) return;
+
+    const text = `To: ${campaign.minister.email}\nSubject: ${data.finalSubject}\n\n${data.finalBody}`;
+    const ok = await copyToClipboard(text);
+    statusEl.className = ok ? "status-msg ok" : "status-msg error";
+    statusEl.textContent = ok
+      ? "Copied — paste it into any email app or webmail, addressed to the minister's email shown above."
+      : "Couldn't copy automatically. Select the letter above and copy it manually.";
   });
 }
