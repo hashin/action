@@ -1,0 +1,21 @@
+{
+  "campaigns": [
+    {
+      "slug": "demo-fix-my-local-road",
+      "status": "demo",
+      "title": "Demo: Fix My Local Road",
+      "category": "Demo / Test",
+      "summary": "A sample campaign so you can see the full flow end-to-end. It is addressed to a test inbox, not a real minister — safe to try.",
+      "background": "This is a placeholder campaign used to test the site before real campaigns go live. It shows how a visitor picks a campaign, sees a drafted letter, fills in their details, and sends it in one click.",
+      "minister": {
+        "name": "Test Inbox (Demo Only)",
+        "designation": "Not a real minister — routes to the site owner for testing",
+        "email": "hashjith@gmail.com",
+        "cc": []
+      },
+      "subject": "Please prioritise repair of {{constituency}} local roads",
+      "body": "Respected Sir/Madam,\n\nI am writing as a resident of {{constituency}} constituency to draw your attention to the poor condition of local roads in our area, which has become a daily hazard for commuters, students, and senior citizens, especially during the monsoon.\n\nI request that the department prioritise inspection and repair works in this constituency at the earliest, and share an indicative timeline for the same.\n\nThank you for your attention to this matter.\n\nRegards,\n{{sender_name}}\n{{constituency}} constituency\n{{date}}",
+      "created": "2026-08-10"
+    }
+  ]
+}

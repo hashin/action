@@ -1,0 +1,27 @@
+{
+  "_note": "Kerala Council of Ministers (Satheesan Ministry, formed 18 May 2026). Emails/staff are placeholders — fill from the ministers-roster spreadsheet before using in a live campaign. Never send to a real minister until email is verified.",
+  "updated": "2026-08-10",
+  "ministers": [
+    { "id": "cm-satheesan", "name": "V. D. Satheesan", "designation": "Chief Minister", "portfolios": "General Administration, Finance, Law, Ports, Planning, IT, Science & Technology, Environment, Personnel", "constituency": "Paravur", "party": "INC", "email": "FILL_ME" },
+    { "id": "ramesh-chennithala", "name": "Ramesh Chennithala", "designation": "Minister", "portfolios": "Home, Vigilance, Coir", "constituency": "", "party": "INC", "email": "FILL_ME" },
+    { "id": "k-muraleedharan", "name": "K. Muraleedharan", "designation": "Minister", "portfolios": "Health and Family Welfare, Devaswom", "constituency": "", "party": "INC", "email": "FILL_ME" },
+    { "id": "sunny-joseph", "name": "Sunny Joseph", "designation": "Minister", "portfolios": "Electricity, Environment, Parliamentary Affairs", "constituency": "", "party": "INC", "email": "FILL_ME" },
+    { "id": "shibu-baby-john", "name": "Shibu Baby John", "designation": "Minister", "portfolios": "Forests and Wildlife, Skill Development", "constituency": "", "party": "RSP", "email": "FILL_ME" },
+    { "id": "mons-joseph", "name": "Mons Joseph", "designation": "Minister", "portfolios": "Water Resources, Housing", "constituency": "", "party": "KEC", "email": "FILL_ME" },
+    { "id": "anoop-jacob", "name": "Anoop Jacob", "designation": "Minister", "portfolios": "Food, Civil Supplies, Consumer Affairs", "constituency": "", "party": "KC(J)", "email": "FILL_ME" },
+    { "id": "pk-kunhalikutty", "name": "P. K. Kunhalikutty", "designation": "Minister", "portfolios": "Industries, Information Technology", "constituency": "", "party": "IUML", "email": "FILL_ME" },
+    { "id": "cp-john", "name": "C. P. John", "designation": "Minister", "portfolios": "Transport", "constituency": "", "party": "CMP", "email": "FILL_ME" },
+    { "id": "ap-anil-kumar", "name": "A. P. Anil Kumar", "designation": "Minister", "portfolios": "Revenue", "constituency": "", "party": "INC", "email": "FILL_ME" },
+    { "id": "n-samsudheen", "name": "N. Samsudheen", "designation": "Minister", "portfolios": "General Education, Minority Welfare", "constituency": "", "party": "IUML", "email": "FILL_ME" },
+    { "id": "roji-m-john", "name": "Roji M. John", "designation": "Minister", "portfolios": "Higher Education (Collegiate, Technical Education, Universities)", "constituency": "", "party": "INC", "email": "FILL_ME" },
+    { "id": "pc-vishnunadh", "name": "P. C. Vishnunadh", "designation": "Minister", "portfolios": "Tourism, Culture", "constituency": "", "party": "INC", "email": "FILL_ME" },
+    { "id": "bindhu-krishna", "name": "Bindhu Krishna", "designation": "Minister", "portfolios": "Labour, Dairy Development, Women & Child Development, Animal Husbandry", "constituency": "", "party": "INC", "email": "FILL_ME" },
+    { "id": "m-liju", "name": "M. Liju", "designation": "Minister", "portfolios": "Excise, Co-operation", "constituency": "", "party": "INC", "email": "FILL_ME" },
+    { "id": "km-shaji", "name": "K. M. Shaji", "designation": "Minister", "portfolios": "Local Self Governments", "constituency": "", "party": "IUML", "email": "FILL_ME" },
+    { "id": "pk-basheer", "name": "P. K. Basheer", "designation": "Minister", "portfolios": "Public Works", "constituency": "", "party": "IUML", "email": "FILL_ME" },
+    { "id": "ve-abdul-gafoor", "name": "V. E. Abdul Gafoor", "designation": "Minister", "portfolios": "Fisheries, Social Justice", "constituency": "", "party": "IUML", "email": "FILL_ME" },
+    { "id": "t-siddique", "name": "T. Siddique", "designation": "Minister", "portfolios": "Agriculture", "constituency": "", "party": "INC", "email": "FILL_ME" },
+    { "id": "ka-thulasi", "name": "K. A. Thulasi", "designation": "Minister", "portfolios": "Scheduled Castes, Scheduled Tribes, Backward Classes Welfare", "constituency": "", "party": "INC", "email": "FILL_ME" },
+    { "id": "oj-janeesh", "name": "O. J. Janeesh", "designation": "Minister", "portfolios": "Sports, Youth Affairs, Archaeology", "constituency": "", "party": "INC", "email": "FILL_ME" }
+  ]
+}
