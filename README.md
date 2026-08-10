@@ -2,7 +2,8 @@
 
 A free, static "write to your minister" site: visitors pick a campaign, review a drafted
 letter, fill in their name/contact/constituency, and send it to the target office in one click.
-No visitor registration. No paid backend.
+Visitors can also propose new campaigns themselves via a "Start a Campaign" form. No visitor
+registration. No paid backend.
 
 ## Stack (all free)
 
@@ -20,20 +21,29 @@ No visitor registration. No paid backend.
 - **Letters:** pre-written per campaign (see the `create-campaign` skill below) rather than a
   live AI API call, since that would need a paid/hosted backend or an exposed API key to work
   from a static site.
+- **New campaign proposals:** `start-campaign.html` lets any visitor propose a campaign (pick a
+  minister, describe the issue and the ask). Nothing publishes automatically — it's moderated:
+  submissions land in a "Campaign Requests" tab in the same Sheet, and you review and publish
+  the ones worth pursuing (see `docs/SETUP.md`). A public form that auto-published straight to
+  `data/campaigns.json` would let anyone send letters to real ministers under this site's name
+  with no review — not something to build unmoderated.
 
 ## Structure
 
 ```
 index.html              Homepage — campaign list
 campaign.html            Campaign detail + send form (reads ?c=<slug>)
+start-campaign.html      Public "propose a campaign" form (goes to a review queue)
 assets/css/style.css
 assets/js/app.js         Shared logic: render pages, mailto builder, Sheet logging
 assets/js/config.js      Set APPS_SCRIPT_URL here after deploying the Apps Script
 data/campaigns.json      All campaigns — the site's only content database
 data/ministers.json      Kerala Council of Ministers roster (emails start as placeholders)
 data/ministers-roster.xlsx   Fill-in spreadsheet to collect verified staff emails
-apps-script/Code.gs       Google Apps Script source — appends submissions to a Sheet
-docs/SETUP.md             Step-by-step: Apps Script, DNS (Spaceship), GitHub Pages
+apps-script/Code.gs       Google Apps Script source — appends submissions and campaign
+                            requests to separate tabs in one Sheet
+docs/SETUP.md             Step-by-step: Apps Script, DNS (Spaceship), GitHub Pages,
+                            reviewing campaign requests
 .claude/skills/create-campaign/   A Claude Code skill: run it to interactively draft
                                     and add a new campaign
 ```

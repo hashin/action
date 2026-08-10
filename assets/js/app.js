@@ -339,3 +339,152 @@ async function renderCampaignPage() {
       : "Couldn't copy automatically. Select the letter above and copy it manually.";
   });
 }
+
+// ---------- Start a Campaign (public submission, goes to a review queue) ----------
+
+async function renderStartCampaignPage() {
+  const root = document.getElementById("startCampaignRoot");
+  let ministers, constituencies;
+  try {
+    const [ministerData, constituencyData] = await Promise.all([
+      fetchJSON("data/ministers.json"),
+      fetchJSON("data/constituencies.json")
+    ]);
+    ministers = ministerData.ministers || [];
+    constituencies = constituencyData;
+  } catch (err) {
+    root.innerHTML = `<p>Couldn't load this page. Please refresh.</p>`;
+    console.error(err);
+    return;
+  }
+
+  document.title = "Start a Campaign — action.hashin.me";
+
+  const ministerOptions = ministers.map(m =>
+    `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)} — ${escapeHtml(m.portfolios || m.designation)}</option>`
+  ).join("");
+
+  const constituencyOptions = constituencies.map(name =>
+    `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`
+  ).join("");
+
+  root.innerHTML = `
+    <section class="hero">
+      <h1>Start a campaign</h1>
+      <p>Tell us about an issue you want raised with a minister. We'll review it and, if it's a
+      good fit, turn it into a campaign others can send too. This doesn't send anything by
+      itself — it's a proposal for review.</p>
+    </section>
+    <form id="requestForm">
+      <div class="panel">
+        <h2>The campaign</h2>
+        <div class="field field full">
+          <label for="campaignTitle">Campaign title *</label>
+          <input id="campaignTitle" type="text" required placeholder="e.g. Fix Kuttanad Flood Drainage">
+        </div>
+        <div class="field-grid">
+          <div class="field">
+            <label for="targetMinister">Target minister *</label>
+            <select id="targetMinister" required>
+              <option value="" disabled selected>Select a minister</option>
+              ${ministerOptions}
+            </select>
+          </div>
+          <div class="field">
+            <label for="category">Category</label>
+            <input id="category" type="text" placeholder="e.g. Roads & Infrastructure (optional)">
+          </div>
+        </div>
+        <div class="field field full">
+          <label for="background">What's the issue? *</label>
+          <textarea id="background" required placeholder="What's happening, and why does it matter?" style="min-height:100px"></textarea>
+        </div>
+        <div class="field field full">
+          <label for="theAsk">What should the minister do? *</label>
+          <textarea id="theAsk" required placeholder="Be specific — a decision, an inspection, funding, a timeline..." style="min-height:80px"></textarea>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Your details</h2>
+        <div class="field-grid">
+          <div class="field">
+            <label for="senderName">Full name *</label>
+            <input id="senderName" type="text" required autocomplete="name">
+          </div>
+          <div class="field">
+            <label for="senderEmail">Your email *</label>
+            <input id="senderEmail" type="email" required autocomplete="email">
+          </div>
+          <div class="field">
+            <label for="senderPhone">Phone number</label>
+            <input id="senderPhone" type="tel" autocomplete="tel" placeholder="Optional">
+          </div>
+          <div class="field">
+            <label for="constituency">Assembly constituency *</label>
+            <select id="constituency" required>
+              <option value="" disabled selected>Select your constituency</option>
+              ${constituencyOptions}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="send-btn">Submit for review</button>
+      <p class="status-msg" id="statusMsg"></p>
+      <p class="privacy-note">This submits your proposal to our review queue — nothing is sent
+      to any minister and no campaign is published automatically. We record your details only
+      to follow up with you about this submission.</p>
+    </form>
+  `;
+
+  const statusEl = document.getElementById("statusMsg");
+
+  document.getElementById("requestForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    statusEl.className = "status-msg";
+    statusEl.textContent = "";
+
+    const campaignTitle = document.getElementById("campaignTitle").value.trim();
+    const targetMinister = document.getElementById("targetMinister").value;
+    const category = document.getElementById("category").value.trim();
+    const background = document.getElementById("background").value.trim();
+    const theAsk = document.getElementById("theAsk").value.trim();
+    const senderName = document.getElementById("senderName").value.trim();
+    const senderEmail = document.getElementById("senderEmail").value.trim();
+    const senderPhone = document.getElementById("senderPhone").value.trim();
+    const constituency = document.getElementById("constituency").value;
+
+    if (!campaignTitle || !targetMinister || !background || !theAsk || !senderName || !senderEmail || !constituency) {
+      statusEl.className = "status-msg error";
+      statusEl.textContent = "Please fill in all the required fields (marked *).";
+      return;
+    }
+
+    if (!window.APPS_SCRIPT_URL) {
+      // Unlike the send-letter flow (where mailto: still works without the Sheet), this
+      // form has no fallback — without logging configured, a submission would vanish silently.
+      statusEl.className = "status-msg error";
+      statusEl.textContent = "Submissions aren't being accepted right now — please try again later.";
+      return;
+    }
+
+    submitToSheet({
+      type: "campaign_request",
+      campaign_title: campaignTitle,
+      category,
+      target_minister: targetMinister,
+      background,
+      the_ask: theAsk,
+      sender_name: senderName,
+      sender_email: senderEmail,
+      sender_phone: senderPhone,
+      constituency,
+      timestamp: new Date().toISOString()
+    });
+
+    document.getElementById("requestForm").reset();
+    statusEl.className = "status-msg ok";
+    statusEl.textContent = "Thanks — your campaign idea has been submitted for review. We'll be in touch if it goes live.";
+  });
+}

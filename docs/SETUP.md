@@ -53,3 +53,14 @@ That's it — visiting `https://action.hashin.me` should show the site.
 ## Testing safely
 
 The site ships with one **demo campaign** ("Demo: Fix My Local Road") whose "minister" email is your own inbox (`hashjith@gmail.com`), so you can click through the whole flow — including the Google Sheet logging — without emailing anyone real. Once you're happy, add real campaigns (see the `create-campaign` skill) and either edit `data/campaigns.json` to remove the demo, or set its `"status"` to `"closed"` so it stops showing on the homepage but stays in history.
+
+## Reviewing "Start a Campaign" requests
+
+Any visitor can propose a new campaign from `start-campaign.html` (linked from the homepage). Nothing is published automatically — each submission lands as a new row in the **"Campaign Requests"** tab of your Google Sheet (created automatically on first submission, alongside the existing "Submissions" tab), with columns: Timestamp, Status, Campaign Title, Category, Target Minister, Background / Issue, The Ask, Sender Name, Sender Email, Sender Phone, Constituency.
+
+To review:
+1. Open the Sheet and check the "Campaign Requests" tab periodically.
+2. For a submission worth pursuing, either ask Claude Code to run it through the `create-campaign` skill (paste in the row's details — title, minister, background, ask), or draft it yourself and add it to `data/campaigns.json` directly.
+3. Once you've acted on a row, fill in its **Status** cell — `Published` or `Rejected` — so you don't review it twice. Rows with a blank Status are your queue.
+
+If you update `apps-script/Code.gs` for this (it now routes by a `type` field, and the token check is unchanged), remember the redeploy step from part 1: **Deploy → Manage deployments → Edit → New version → Deploy**.
